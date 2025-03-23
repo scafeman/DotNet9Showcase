@@ -1,0 +1,40 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="mb-4 p-4 bg-light rounded shadow-sm">
+    <h1 class="display-5">Welcome to the .NET 9 Showcase</h1>
+    <p class="lead">This demo shows off Razor Pages, SQLite, image upload, and clean Bootstrap UI — all built with .NET 9.</p>
+</div>
+
+    <a asp-page="/Products/Index" class="btn btn-primary mb-4">📦 View Full Product Catalog</a>
+
+    @if (Model.TopProducts.Any())
+    {
+        <h2>Latest Products</h2>
+        <div class="row">
+            @foreach (var product in Model.TopProducts)
+            {
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        @if (!string.IsNullOrEmpty(product.ImagePath))
+                        {
+                            <img src="@product.ImagePath"
+                                class="card-img-top rounded-top"
+                                style="object-fit: cover; height: 400px; width: 100%; border-bottom: 1px solid #ccc;" />
+                        }
+                        <div class="card-body">
+                            <h5 class="card-title">@product.Name</h5>
+                            <p class="card-text">Price: $@product.Price</p>
+                            <p class="text-muted">Created: @product.CreatedAt.ToString("g")</p>
+                            <a asp-page="/Products/Edit" asp-route-id="@product.Id" class="btn btn-sm btn-primary">Edit</a>
+                            <a asp-page="/Products/Delete" asp-route-id="@product.Id" class="btn btn-sm btn-danger">Delete</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

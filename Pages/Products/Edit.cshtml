@@ -1,0 +1,41 @@
+@page "{id:int}"
+@model DotNet9Showcase.Pages.Products.EditModel
+@{
+    ViewData["Title"] = "Edit Product";
+}
+
+<h1>Edit Product</h1>
+
+<form method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+        <input type="hidden" asp-for="Product.Id" />
+        <label asp-for="Product.Name" class="form-label"></label>
+        <input asp-for="Product.Name" class="form-control" />
+        <span asp-validation-for="Product.Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Product.Price" class="form-label"></label>
+        <input asp-for="Product.Price" class="form-control" />
+        <span asp-validation-for="Product.Price" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label for="UploadedImage" class="form-label">Change Image</label>
+        <input type="file" name="UploadedImage" id="UploadedImage" class="form-control" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Product.ImagePath))
+    {
+        <div class="mb-3">
+            <img src="@Model.Product.ImagePath" style="max-height:100px;" />
+        </div>
+    }
+
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a asp-page="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
