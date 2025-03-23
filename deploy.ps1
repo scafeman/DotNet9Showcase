@@ -5,7 +5,7 @@ $branch     = "main"
 $deployPath = "C:\deploy\DotNet9Showcase"
 $sitePath   = "C:\inetpub\wwwroot\DotNet9Showcase"
 
-# Clone or pull latest
+# Clone or pull latest from GitHub
 if (-Not (Test-Path $deployPath)) {
     git clone -b $branch $repoUrl $deployPath
 } else {
@@ -13,11 +13,8 @@ if (-Not (Test-Path $deployPath)) {
     git pull origin $branch
 }
 
-# Clean old publish folder
-Remove-Item "$deployPath\publish" -Recurse -Force -ErrorAction SilentlyContinue
-
 # Publish the app
-dotnet publish "$deployPath\DotNet9Showcase.csproj" -c Release -o publish
+dotnet publish "$deployPath\DotNet9Showcase.csproj" -c Release -o "$deployPath\publish"
 
-# Deploy to IIS
+# Copy published output to IIS site directory
 Copy-Item "$deployPath\publish\*" $sitePath -Recurse -Force
