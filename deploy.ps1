@@ -1,10 +1,11 @@
 # deploy.ps1
 
-$repoUrl    = "https://github.com/scafeman/DotNet9Showcase.git"
-$branch     = "main"
-$deployPath = "C:\deploy\DotNet9Showcase"
-$sitePath   = "C:\inetpub\wwwroot\DotNet9Showcase"
-$appPool    = "DotNet9Showcase"
+$repoUrl     = "https://github.com/scafeman/DotNet9Showcase.git"
+$branch      = "main"
+$deployPath  = "C:\deploy\DotNet9Showcase"
+$sitePath    = "C:\inetpub\wwwroot\DotNet9Showcase"
+$publishPath = "$deployPath\_publish"
+$appPool     = "DotNet9Showcase"
 
 # Stop IIS App Pool to unlock files
 Import-Module WebAdministration
@@ -21,11 +22,18 @@ if (-Not (Test-Path $deployPath)) {
     git pull origin $branch
 }
 
-# Publish the app
-dotnet publish "$deployPath\DotNet9Showcase.csproj" -c Release -o "$deployPath\publish"
+# Clean previous publish output
+if (Test-Path $publishPath) {
+    Write-Host "Cleaning old publish directory: $publishPath"
+    Remove-Item $publishPath -Recurse -Force -ErrorAction SilentlyContinue
+}
 
-# Copy to IIS folder
-Copy-Item "$deployPath\publish\*" $sitePath -Recurse -Force
+# Publish the app to a clean directory
+dotnet publish "$deployPath\DotNet9Showcase.csproj" -c Release -o $publishPath
+
+# Copy published content to IIS web root
+Write-Host "Deploying to IIS site path: $sitePath"
+Copy-Item "$publishPath\*" $sitePath -Recurse -Force
 
 # Start IIS App Pool
 if (Test-Path IIS:\AppPools\$appPool) {
