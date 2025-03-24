@@ -7,3 +7,4 @@ wwwroot/images/products/
 *.user
 *.suo
 *.vs/
+appsettings.json

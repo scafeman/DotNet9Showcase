@@ -5,13 +5,15 @@ using DotNet9Showcase.Data;
 using Microsoft.AspNetCore.Http;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 
 namespace DotNet9Showcase.Pages.Products
 {
     public class CreateModel : PageModel
     {
         private readonly AppDbContext _context;
-        private readonly ILogger<CreateModel> _logger;
+        private readonly IConfiguration _config;
 
         [BindProperty]
         public Product Product { get; set; } = new();
@@ -19,10 +21,10 @@ namespace DotNet9Showcase.Pages.Products
         [BindProperty]
         public IFormFile? UploadedImage { get; set; }
 
-        public CreateModel(AppDbContext context, ILogger<CreateModel> logger)
+        public CreateModel(AppDbContext context, IConfiguration config)
         {
             _context = context;
-            _logger = logger;
+            _config = config;
         }
 
         public void OnGet() { }
@@ -32,59 +34,42 @@ namespace DotNet9Showcase.Pages.Products
             if (!ModelState.IsValid)
                 return Page();
 
-            try
+            if (UploadedImage != null && UploadedImage.Length > 0)
             {
-                if (UploadedImage != null && UploadedImage.Length > 0)
+                var connectionString = _config["AzureBlob:ConnectionString"];
+                var containerName = _config["AzureBlob:ContainerName"];
+                var containerUrl = $"https://mscafescusstoraccount.blob.core.windows.net/{containerName}";
+
+                var blobServiceClient = new BlobServiceClient(connectionString);
+                var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+                await containerClient.CreateIfNotExistsAsync(PublicAccessType.Blob);
+
+                var fileExt = Path.GetExtension(UploadedImage.FileName);
+                var blobName = $"{Guid.NewGuid()}{fileExt}";
+                var blobClient = containerClient.GetBlobClient(blobName);
+
+                using var inputStream = UploadedImage.OpenReadStream();
+                using var image = Image.Load(inputStream);
+
+                image.Mutate(x => x.Resize(new ResizeOptions
                 {
-                    var fileExt = Path.GetExtension(UploadedImage.FileName).ToLowerInvariant();
-                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                    Mode = ResizeMode.Max,
+                    Size = new Size(400, 400)
+                }));
 
-                    if (!allowedExtensions.Contains(fileExt))
-                    {
-                        ModelState.AddModelError("UploadedImage", "Only JPG, PNG, or GIF files are allowed.");
-                        return Page();
-                    }
+                using var outputStream = new MemoryStream();
+                await image.SaveAsJpegAsync(outputStream);
+                outputStream.Position = 0;
 
-                    var rootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
-                    _logger.LogInformation("Creating folder: {path}", rootPath);
-                    Directory.CreateDirectory(rootPath); // Ensures parent folders
+                await blobClient.UploadAsync(outputStream, overwrite: true);
 
-                    var fileName = $"{Guid.NewGuid()}{fileExt}";
-                    var filePath = Path.Combine(rootPath, fileName);
-
-                    using var stream = UploadedImage.OpenReadStream();
-                    using var image = Image.Load(stream);
-
-                    image.Mutate(x => x.Resize(new ResizeOptions
-                    {
-                        Mode = ResizeMode.Max,
-                        Size = new Size(300, 300)
-                    }));
-
-                    await image.SaveAsync(filePath);
-                    _logger.LogInformation("Saved image to: {filePath}", filePath);
-
-                    // Save the web path
-                    Product.ImagePath = $"/images/products/{fileName}";
-                }
-                else
-                {
-                    _logger.LogWarning("No image uploaded.");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Image upload failed.");
-                ModelState.AddModelError("UploadedImage", $"Image upload failed: {ex.Message}");
-                return Page();
+                // Save the full public URL
+                Product.ImagePath = $"{containerUrl}/{blobName}";
             }
 
             Product.CreatedAt = DateTime.UtcNow;
             _context.Products.Add(Product);
             await _context.SaveChangesAsync();
-            TempData["SuccessMessage"] = "Product created successfully!";
-            TempData["SuccessMessage"] = "Product updated successfully!";
-            TempData["SuccessMessage"] = "Product deleted.";
             return RedirectToPage("Index");
         }
     }

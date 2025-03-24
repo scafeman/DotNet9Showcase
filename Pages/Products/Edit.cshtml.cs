@@ -6,17 +6,21 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
+using Azure.Storage.Blobs;
+using System.Text.RegularExpressions;
 
 namespace DotNet9Showcase.Pages.Products;
 
 public class EditModel : PageModel
 {
     private readonly AppDbContext _context;
+    private readonly IConfiguration _config;
     private readonly ILogger<EditModel> _logger;
 
-    public EditModel(AppDbContext context, ILogger<EditModel> logger)
+    public EditModel(AppDbContext context, IConfiguration config, ILogger<EditModel> logger)
     {
         _context = context;
+        _config = config;
         _logger = logger;
     }
 
@@ -58,11 +62,26 @@ public class EditModel : PageModel
                 return Page();
             }
 
-            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
-            Directory.CreateDirectory(uploadsFolder);
+            // 🔁 Delete old blob if exists
+            if (!string.IsNullOrEmpty(existingProduct.ImagePath))
+            {
+                try
+                {
+                    var containerName = _config["AzureBlob:ContainerName"];
+                    var connStr = _config["AzureBlob:ConnectionString"];
+                    var oldBlobName = Path.GetFileName(new Uri(existingProduct.ImagePath).AbsolutePath);
+                    var container = new BlobContainerClient(connStr, containerName);
+                    await container.DeleteBlobIfExistsAsync(oldBlobName);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Failed to delete old image blob: {Message}", ex.Message);
+                }
+            }
 
-            var fileName = $"{Guid.NewGuid()}{fileExt}";
-            var filePath = Path.Combine(uploadsFolder, fileName);
+            // 📤 Upload new image
+            var blobFileName = $"{Guid.NewGuid()}{fileExt}";
+            var tempPath = Path.Combine(Path.GetTempPath(), blobFileName);
 
             using var stream = UploadedImage.OpenReadStream();
             using var image = Image.Load(stream);
@@ -73,19 +92,16 @@ public class EditModel : PageModel
                 Size = new Size(300, 300)
             }));
 
-            await image.SaveAsync(filePath);
+            await image.SaveAsync(tempPath);
 
-            // Optional: delete old image
-            if (!string.IsNullOrEmpty(existingProduct.ImagePath))
-            {
-                var oldPath = Path.Combine("wwwroot", existingProduct.ImagePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                if (System.IO.File.Exists(oldPath))
-                {
-                    System.IO.File.Delete(oldPath);
-                }
-            }
+            var blobContainer = new BlobContainerClient(
+                _config["AzureBlob:ConnectionString"],
+                _config["AzureBlob:ContainerName"]);
 
-            existingProduct.ImagePath = $"/images/products/{fileName}";
+            await blobContainer.CreateIfNotExistsAsync();
+            await blobContainer.UploadBlobAsync(blobFileName, System.IO.File.OpenRead(tempPath));
+
+            existingProduct.ImagePath = $"{blobContainer.Uri}/{blobFileName}";
         }
 
         await _context.SaveChangesAsync();
