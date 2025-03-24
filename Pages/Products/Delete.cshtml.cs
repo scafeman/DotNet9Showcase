@@ -42,9 +42,9 @@ public class DeleteModel : PageModel
         {
             try
             {
-                var connectionString = _config["AzureBlob:ConnectionString"];
+                var connStr = Environment.GetEnvironmentVariable("AZURE_BLOB_CONNECTION_STRING");
                 var containerName = _config["AzureBlob:ContainerName"];
-                var blobClient = new BlobContainerClient(connectionString, containerName);
+                var blobClient = new BlobContainerClient(connStr, containerName);
                 var blobName = Path.GetFileName(new Uri(product.ImagePath).AbsolutePath);
 
                 await blobClient.DeleteBlobIfExistsAsync(blobName);

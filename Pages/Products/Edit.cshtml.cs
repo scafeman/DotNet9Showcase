@@ -62,13 +62,15 @@ public class EditModel : PageModel
                 return Page();
             }
 
+            // 🛠️ Move these here so both delete and upload can access them
+            var connStr = Environment.GetEnvironmentVariable("AZURE_BLOB_CONNECTION_STRING");
+            var containerName = _config["AzureBlob:ContainerName"];
+
             // 🔁 Delete old blob if exists
             if (!string.IsNullOrEmpty(existingProduct.ImagePath))
             {
                 try
                 {
-                    var containerName = _config["AzureBlob:ContainerName"];
-                    var connStr = _config["AzureBlob:ConnectionString"];
                     var oldBlobName = Path.GetFileName(new Uri(existingProduct.ImagePath).AbsolutePath);
                     var container = new BlobContainerClient(connStr, containerName);
                     await container.DeleteBlobIfExistsAsync(oldBlobName);
@@ -94,10 +96,7 @@ public class EditModel : PageModel
 
             await image.SaveAsync(tempPath);
 
-            var blobContainer = new BlobContainerClient(
-                _config["AzureBlob:ConnectionString"],
-                _config["AzureBlob:ContainerName"]);
-
+            var blobContainer = new BlobContainerClient(connStr, containerName);
             await blobContainer.CreateIfNotExistsAsync();
             await blobContainer.UploadBlobAsync(blobFileName, System.IO.File.OpenRead(tempPath));
 

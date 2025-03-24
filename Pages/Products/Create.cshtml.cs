@@ -36,11 +36,16 @@ namespace DotNet9Showcase.Pages.Products
 
             if (UploadedImage != null && UploadedImage.Length > 0)
             {
-                var connectionString = _config["AzureBlob:ConnectionString"];
+                var connStr = Environment.GetEnvironmentVariable("AZURE_BLOB_CONNECTION_STRING", EnvironmentVariableTarget.Machine);
+                if (string.IsNullOrWhiteSpace(connStr))
+                {
+                    throw new InvalidOperationException("AZURE_BLOB_CONNECTION_STRING is not set.");
+                }
+
                 var containerName = _config["AzureBlob:ContainerName"];
                 var containerUrl = $"https://mscafescusstoraccount.blob.core.windows.net/{containerName}";
 
-                var blobServiceClient = new BlobServiceClient(connectionString);
+                var blobServiceClient = new BlobServiceClient(connStr);
                 var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
                 await containerClient.CreateIfNotExistsAsync(PublicAccessType.Blob);
 

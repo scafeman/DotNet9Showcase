@@ -3,6 +3,11 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var connectionString = Environment.GetEnvironmentVariable("AZURE_BLOB_CONNECTION_STRING");
+
+builder.Configuration.AddEnvironmentVariables(); // ensure env vars are included
+var config = builder.Configuration;
+
 // Define the SQLite DB path (App_Data inside the root directory)
 var dbPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DotNet9Showcase.db");
 
